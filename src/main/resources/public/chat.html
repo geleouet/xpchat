@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .chat-container {
+            width: 50em;
+            margin: 2em auto;
+            padding: 2em;
+            border: 1px solid #ccc;
+            border-radius: 15px;
+            overflow-y: scroll;
+            max-height: 30em;
+        }
+        .message {
+            margin-bottom: 10px;
+            overflow: hidden;
+            border: 1px solid #ccc;
+            border-radius: 1em;
+            padding: 1em;
+           
+        }
+        .pdfBubble {
+            margin-top: 5px;
+            margin-bottom: 3px;
+            overflow: hidden;
+            border: 1px solid #ccc;
+            border-radius: 1em;
+            padding: 1em;
+        }
+        .user {
+            font-weight: bold;
+        }
+        .message-bubble {
+            display: inline-block;
+            padding: 1em;
+            margin-bottom: 1em;
+            max-width: 70%;
+            white-space: pre-wrap;
+        }
+        .message-left {
+            background-color: #f2f2f2;
+            float: left;
+            clear: both;
+            margin-right: 5em;
+        }
+        .message-right {
+            background-color: #beceff;
+            float: right;
+            clear: both;
+            margin-left: 5em;
+        }
+        #message-form {
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        #message-input {
+            width: 70%;
+            height: 8em;
+            padding: 10px;
+            float: left;
+        }
+        #message-submit {
+            width: 25%;
+            padding: 10px;
+            border-radius: 15px;
+            margin-top: 1em;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            float: right;
+            cursor: pointer;
+        }
+        #start {
+            width: 25%;
+            padding: 10px;
+            border-radius: 15px;
+            border: none;
+            background-color: #81efef;
+            color: white;
+            float: right;
+            cursor: pointer;
+        }
+        #stop {
+            width: 25%;
+            padding: 10px;
+            border-radius: 15px;
+            border: none;
+            background-color: #e86e6e;
+            color: white;
+            float: right;
+            cursor: pointer;
+        }
+        #message2Img-submit {
+            width: 25%;
+            padding: 10px;
+            margin-top: 1em;
+            border-radius: 15px;
+            border: none;
+            background-color: #687469;
+            color: white;
+            float: right;
+            cursor: pointer;
+        }
+        #pdf-form {
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        #pdf-input {
+            width: 70%;
+            padding: 10px;
+            float: left;
+        }
+        #pdf-submit {
+            width: 25%;
+            padding: 10px;
+            border-radius: 15px;
+            border: none;
+            background-color: #4c60af;
+            color: white;
+            float: right;
+            cursor: pointer;
+        }
+   
+
+     .loader {
+        width: 5em;
+        height: 5em;
+        border-radius: 50%;
+        position: relative;
+        animation: rotate 3s linear infinite
+      }
+      .loader::before , .loader::after {
+        content: "";
+        box-sizing: border-box;
+        position: absolute;
+        inset: 0px;
+        border-radius: 50%;
+        border: 1em solid #FFF;
+        animation: prixClipFix 2s linear infinite ;
+      }
+      .loader::after{
+        border-color: #917aec;
+      }
+
+      @keyframes rotate {
+        0%   {transform: rotate(0deg)}
+        100%   {transform: rotate(360deg)}
+      }
+
+      @keyframes prixClipFix {
+          0%   {clip-path:polygon(50% 50%,0 0,0 0,0 0,0 0,0 0)}
+          50%  {clip-path:polygon(50% 50%,0 0,100% 0,100% 0,100% 0,100% 0)}
+          100%   {clip-path:polygon(50% 50%,0 0,0 0,0 0,0 0,0 0)}
+      }
+   
+
+
+    </style>
+</head>
+<body>
+    <div class="chat-container" id="chat-container">
+        <div class="message message-left">
+            <div class="user">Gaëtan:</div>
+            <div class="message-bubble message-left">Bonjour, comment puis-je aider ?</div>
+        </div>
+       
+        
+    </div>
+    <div class="chat-container">
+        <div id="LOADER" class="loader" style="display: none;"></div>
+        <div id="forms">
+            <div>
+                <div id="output">
+                </div>
+            </div>
+            <form id="message-form">
+                <input type="text" id="message-input" placeholder="Entrez votre message...">
+                <button id = "start"> 🎤 </button>
+                <button id = "stop" style="display: none;"> Stop Recording </button>
+                <button type="submit" id="message-submit">Envoyer</button>
+                <button id="message2Img-submit" onclick="draw(); return false;">Dessiner</button>
+            </form>
+            <div id="pdfs">
+                <form id="pdf-form">
+                    <input type="file" id="pdf-input" placeholder="Ajouter un document..." accept="application/pdf">
+                    <button type="submit" id="pdf-submit">Envoyer un pdf</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+         const chatContainer = document.getElementById('chat-container');
+
+// WebSocket connection
+ socket = new WebSocket('wss://'+window.location.host+'/api/canal');
+socket.addEventListener("close", (event) => {
+  setTimeout(() => {
+    socket = new WebSocket('wss://'+window.location.host+'/api/canal');
+  }, 200)
+});
+currentMessage = -1
+socket.addEventListener('message', function(event) {
+    console.log("Voici un message du serveur", event.data);
+    const message = JSON.parse(event.data);
+    if (message.message) {
+
+    
+    console.log("Voici un message JSON du serveur", event.data);
+    if (currentMessage == -1) {
+        currentMessage = addMessage('Gaëtan:', message.message, 'left');
+    }
+    else {
+        currentMessage.textContent += (message.message).replace("\n", "\r\n")
+    }
+    var chatContainer = document.getElementById('chat-container');
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+else {
+    currentMessage = -1;
+                document.getElementById('forms').style.display = 'block';
+                document.getElementById('LOADER').style.display = 'none';
+}
+});
+
+        document.getElementById('message-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            var messageInput = document.getElementById('message-input');
+            var messageText = messageInput.value.trim();
+            if (messageText !== '') {
+                sendMessage(messageText);
+                addMessage('Vous:', messageText, 'right');
+                currentMessage = -1;
+                messageInput.value = '';
+                document.getElementById('forms').style.display = 'none';
+                document.getElementById('LOADER').style.display = 'block';
+            }
+        });
+
+        document.getElementById('pdf-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var input = document.getElementById("pdf-input")
+            document.getElementById('forms').style.display = 'none';
+                document.getElementById('LOADER').style.display = 'block';
+
+var data = new FormData()
+data.append('document', input.files[0])
+
+fetch('/api/upload', {
+  method: 'POST',
+  body: data
+}).then(response => {
+    if (!response.ok) {
+        throw new Error('Erreur lors de l\'envoi du pdf')
+    }
+    var pdfBuble = document.createElement('div');
+    pdfBuble.className ="pdfBubble"
+    pdfBuble.textContent =  input.files[0].name;
+    document.getElementById("pdfs").prepend(pdfBuble)
+    input.value = null
+    document.getElementById('forms').style.display = 'block';
+                document.getElementById('LOADER').style.display = 'none';
+
+})
+
+           
+        });
+
+        function draw() {
+            var messageInput = document.getElementById('message-input');
+            var messageText = messageInput.value.trim();
+            addMessage('Vous:', "Dessine: " + messageText, 'right');
+                currentMessage = -1;
+                messageInput.value = '';
+                document.getElementById('forms').style.display = 'none';
+                document.getElementById('LOADER').style.display = 'block';
+
+            fetch('api/chat2Img', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: messageText })
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Erreur lors de l\'envoi du message');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(data); // Gérer la réponse si nécessaire
+                
+                imgMessage = addMessage('Gaëtan:', "Je dessine :", 'left');
+                var x = document.createElement('img');
+                imgMessage.append(x)
+                x.style.width = "100%"
+                x.src = 'data:image/png;base64,'+data.images[0];
+                document.getElementById('forms').style.display = 'block';
+                document.getElementById('LOADER').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+            });
+            
+        }
+
+        function sendMessage(message) {
+            fetch('api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erreur lors de l\'envoi du message');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log(data); // Gérer la réponse si nécessaire
+                addMessage('Vous:', message, 'right');
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+            });
+        }
+
+        function addMessage(user, message, alignment) {
+            var chatContainer = document.getElementById('chat-container');
+            var messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.classList.add('message-' + alignment);
+            var messageBubble = document.createElement('div');
+            messageBubble.className = 'message-bubble';
+            messageBubble.textContent = message;
+            messageDiv.appendChild(document.createElement('div')).className = 'user';
+            messageDiv.childNodes[0].textContent = user;
+            messageDiv.appendChild(messageBubble);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageBubble
+        }
+    
+        /*
+        document.getElementById('message-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var messageInput = document.getElementById('message-input');
+            var messageText = messageInput.value.trim();
+            if (messageText !== '') {
+                addMessage('Vous:', messageText, 'right');
+                messageInput.value = '';
+            }
+        });
+        */
+      
+
+ const startButton = document.getElementById('start');
+      const stopButton = document.getElementById('stop');
+      const playButton = document.getElementById('play');
+      let output = document.getElementById('output');
+      let audioRecorder;
+      let audioChunks = [];
+      navigator.mediaDevices.getUserMedia({ audio: true })
+         .then(stream => {
+         
+            // Initialize the media recorder object
+            audioRecorder = new MediaRecorder(stream);
+            
+            // dataavailable event is fired when the recording is stopped
+            audioRecorder.addEventListener('dataavailable', e => {
+               audioChunks.push(e.data);
+            });
+            
+
+            // start recording when the start button is clicked
+            startButton.addEventListener('click', () => {
+               audioChunks = [];
+               audioRecorder.start();
+               //output.innerHTML = 'Recording started! Speak now.';
+               stopButton.style.display = "block"
+               startButton.style.display = "none"
+               cutMicro = setTimeout(() => {
+                    audioRecorder.stop()
+                    stopButton.style.display = "none"
+                    startButton.style.display = "block"
+               }, 5000);
+            });
+            
+            // stop recording when the stop button is clicked
+            stopButton.addEventListener('click', () => {
+               audioRecorder.stop();
+               clearTimeout(cutMicro)
+               //output.innerHTML = 'Recording stopped! Click on the play button to play the recorded audio.';
+               stopButton.style.display = "none"
+               startButton.style.display = "block"
+
+               currentMessage = -1;
+                document.getElementById('forms').style.display = 'none';
+                document.getElementById('LOADER').style.display = 'block';
+
+               setTimeout(() => {
+                   const blobObj = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+                   const audioUrl = URL.createObjectURL(blobObj);
+                   const audio = new Audio(audioUrl);
+                   var formData = new FormData();
+                   formData.append("file", blobObj);
+                   fetch("/api/speech", {
+                       method: "POST",
+                       body: formData,
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Erreur lors de l\'envoi du message');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(data); // Gérer la réponse si nécessaire
+                        addMessage('Vous:', data.message, 'right');
+                        audio.play();
+                    })
+                
+            }, 1000)
+            
+
+
+            });
+            
+            // play the recorded audio when the play button is clicked
+            playButton.addEventListener('click', () => {
+               const blobObj = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+               const audioUrl = URL.createObjectURL(blobObj);
+               const audio = new Audio(audioUrl);
+               audio.play();
+               output.innerHTML = 'Playing the recorded audio!';
+               var formData = new FormData();
+formData.append("file", blobObj);
+fetch("/api/speech", {
+   method: "POST",
+   body: formData,
+})
+.then((response) => response.text())
+.then((responseText) => {
+   console.log(responseText);
+});
+            });
+         }).catch(err => {
+         
+            // If the user denies permission to record audio, then display an error.
+            console.log('Error: ' + err);
+         });
+
+
+
+    </script>
+</body>
+</html>
